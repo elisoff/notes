@@ -4,9 +4,7 @@ class Api::NotesController < ApplicationController
   def index
     notes = Note.all
     
-    result = { :success => true, :rows => notes }
-    
-    respond_with result
+    respond_with notes
   end
   
   def show
@@ -25,7 +23,7 @@ class Api::NotesController < ApplicationController
     errors = validate_fields(request_fields)
     
     if errors.length > 0
-      result = { :success => false, :errors => errors }
+      result = { :errors => { :fields =>  errors } }
     else 
       user = User.find(session[:user_id])
 
@@ -33,7 +31,7 @@ class Api::NotesController < ApplicationController
                          done: request_fields[:done], datetime: request_fields[:datetime],
                          user: user, priority: priority)
                        
-      result = format_result(note)
+      result = note
     end
     
     respond_with result, location: ""
@@ -42,58 +40,41 @@ class Api::NotesController < ApplicationController
   def update
     request_fields = request.request_parameters
     
-    note = get_note(params.require(:id))
-      
-    if note[:success] != false
-      update_hash = request_fields
+    field_errors = validate_fields(request_fields)
+    
+    if field_errors.length > 0
+      errors = { :errors => { :fields => field_errors } }
+    else
+      note = get_note(params.require(:id))
 
-      if request_fields[:prioriry_id]
-        priority = Priority.find(request_fields[:priority_id])
-        update_hash[:priority] = priority
-      end
+      if !note[:errors]
+        update_hash = request_fields
 
       updated_note = note.update(update_hash)
 
       if updated_note
         result = { :success => true }
+        if !updated_note
+          errors = { :errors => updated_note}
+        end
       else
-        result = { :success => false, :errors => updated_note}
+        errors = { :errors => { :msg => "No note found!" } }
       end
-    else
-      result = note
     end
-   
-    respond_with "", json: result
+    
+    if errors
+    else
+    end
   end
   
   def destroy
-    note_id = params.require(:id)
-    
-    deleted_note = Note.destroy(note_id)
     
     rescue ActiveRecord::RecordNotFound 
       result = { :success => false, :errors => "Note not found" }
     
-    if deleted_note
-      result = { :success => true }
-    else 
-      result = { :success => false, :errors => deleted_note }
+    end
     end
     
-    respond_with "", json: result
-  end
-  
-  private
-  def format_result(action)
-    result = { :success => action.errors.count <= 0 ? true : false }
-    
-    if action.errors.count > 0
-      result[:errors] = action.errors 
-    else 
-      result[:rows] = action
-    end
-    
-    result
   end
   
   private
@@ -113,10 +94,8 @@ class Api::NotesController < ApplicationController
   private
   def get_note(id)
     note = Note.find(id)
-    result = format_result(note)
     
     rescue ActiveRecord::RecordNotFound 
-      result = { :success => false, :errors => "Note not found" }
       
     result
   end
