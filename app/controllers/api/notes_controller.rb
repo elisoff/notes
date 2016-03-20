@@ -50,10 +50,13 @@ class Api::NotesController < ApplicationController
       if !note[:errors]
         update_hash = request_fields
 
-      updated_note = note.update(update_hash)
+        if request_fields[:prioriry_id]
+          priority = Priority.find(request_fields[:priority_id])
+          update_hash[:priority] = priority
+        end     
 
-      if updated_note
-        result = { :success => true }
+        updated_note = note.update(update_hash)
+
         if !updated_note
           errors = { :errors => updated_note}
         end
@@ -63,16 +66,24 @@ class Api::NotesController < ApplicationController
     end
     
     if errors
+      respond_with "", status: :unprocessable_entity, json: errors
     else
+      respond_with ""
     end
   end
   
   def destroy
+    note = get_note(params.require(:id))
+    deleted_note = note.destroy
     
-    rescue ActiveRecord::RecordNotFound 
-      result = { :success => false, :errors => "Note not found" }
-    
+    if !deleted_note
+      errors = { :errors => { :msg => "We couldn't delete this note" } }
     end
+
+    if errors
+      respond_with "", status: :unprocessable_entity, json: errors
+    else
+      respond_with ""
     end
     
   end
@@ -94,8 +105,10 @@ class Api::NotesController < ApplicationController
   private
   def get_note(id)
     note = Note.find(id)
+    result = note
     
     rescue ActiveRecord::RecordNotFound 
+      result = { :errors => { :msg => "No note found!" } }
       
     result
   end
